@@ -4,9 +4,325 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>باحث — Bahith</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #f9fafb;
+            color: #1f2937;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            direction: rtl;
+            outline: none;
+        }
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .search-btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .search-btn:hover {
+            background: #2563eb;
+        }
+        .search-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .modes {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .mode-btn {
+            padding: 6px 14px;
+            font-size: 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 20px;
+            background: white;
+            color: #6b7280;
+            cursor: pointer;
+        }
+        .mode-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+            display: none;
+        }
+        .loading.show {
+            display: block;
+        }
+        .ai-answer {
+            background: #f3f4f6;
+            border-right: 3px solid #8b5cf6;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .ai-answer.show {
+            display: block;
+        }
+        .ai-label {
+            font-size: 12px;
+            color: #8b5cf6;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        .ai-text {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #374151;
+        }
+        .ai-sources {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 12px;
+        }
+        .results-header {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .results-header.show {
+            display: block;
+        }
+        .results {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .result-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .result-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .result-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #3b82f6;
+        }
+        .score-badge {
+            font-size: 12px;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+        .score-green {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .score-amber {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .score-red {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .result-snippet {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.7;
+            margin-bottom: 8px;
+        }
+        .result-source {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+        .no-results, .error-msg {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+            display: none;
+        }
+        .no-results.show, .error-msg.show {
+            display: block;
+        }
+        .error-msg {
+            color: #dc2626;
+        }
+    </style>
 </head>
 <body>
-    <h1>باحث</h1>
-    <p>Loading...</p>
+    <div class="container">
+        <header>
+            <h1>باحث</h1>
+            <p class="subtitle">Bahith — Arabic semantic search engine</p>
+        </header>
+
+        <div class="search-box">
+            <input type="text" class="search-input" id="query" placeholder="...ابحث في المحتوى العربي">
+            <button class="search-btn" id="searchBtn" onclick="doSearch()">بحث</button>
+        </div>
+
+        <div class="modes">
+            <button class="mode-btn active" data-mode="hybrid">هجين</button>
+            <button class="mode-btn" data-mode="semantic">بحث دلالي</button>
+            <button class="mode-btn" data-mode="keyword">بحث كلمات</button>
+        </div>
+
+        <div class="loading" id="loading">...جاري البحث</div>
+
+        <div class="ai-answer" id="aiAnswer">
+            <div class="ai-label">إجابة مولّدة بالذكاء الاصطناعي</div>
+            <div class="ai-text" id="aiText"></div>
+            <div class="ai-sources" id="aiSources"></div>
+        </div>
+
+        <div class="results-header" id="resultsHeader"></div>
+
+        <div class="no-results" id="noResults">لم يتم العثور على نتائج</div>
+        <div class="error-msg" id="errorMsg">حدث خطأ أثناء البحث</div>
+
+        <div class="results" id="results"></div>
+    </div>
+
+    <script>
+        let currentMode = 'hybrid';
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+            });
+        });
+
+        document.getElementById('query').addEventListener('keypress', e => {
+            if (e.key === 'Enter') doSearch();
+        });
+
+        async function doSearch() {
+            const query = document.getElementById('query').value.trim();
+            if (!query) return;
+
+            const btn = document.getElementById('searchBtn');
+            const loading = document.getElementById('loading');
+            const aiAnswer = document.getElementById('aiAnswer');
+            const resultsHeader = document.getElementById('resultsHeader');
+            const results = document.getElementById('results');
+            const noResults = document.getElementById('noResults');
+            const errorMsg = document.getElementById('errorMsg');
+
+            btn.disabled = true;
+            loading.classList.add('show');
+            aiAnswer.classList.remove('show');
+            resultsHeader.classList.remove('show');
+            results.innerHTML = '';
+            noResults.classList.remove('show');
+            errorMsg.classList.remove('show');
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, mode: currentMode, top_k: 5 })
+                });
+
+                if (!response.ok) throw new Error('Search failed');
+
+                const data = await response.json();
+
+                loading.classList.remove('show');
+
+                if (data.results.length === 0) {
+                    noResults.classList.add('show');
+                    btn.disabled = false;
+                    return;
+                }
+
+                if (data.answer) {
+                    document.getElementById('aiText').textContent = data.answer;
+                    const sources = data.results.slice(0, 3).map((r, i) => `نتيجة ${i + 1}`).join('، ');
+                    document.getElementById('aiSources').textContent = `المصادر: ${sources}`;
+                    aiAnswer.classList.add('show');
+                }
+
+                resultsHeader.textContent = `${data.total_results} نتائج — ${data.search_time} ثانية`;
+                resultsHeader.classList.add('show');
+
+                data.results.forEach(r => {
+                    const scorePercent = (r.score * 100).toFixed(1);
+                    let scoreClass = 'score-red';
+                    if (r.score >= 0.85) scoreClass = 'score-green';
+                    else if (r.score >= 0.6) scoreClass = 'score-amber';
+
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    card.innerHTML = `
+                        <div class="result-title-row">
+                            <span class="result-title">${r.title}</span>
+                            <span class="score-badge ${scoreClass}">${scorePercent}%</span>
+                        </div>
+                        <div class="result-snippet">${r.snippet}</div>
+                        <div class="result-source">ويكيبيديا العربية — ${r.source}</div>
+                    `;
+                    results.appendChild(card);
+                });
+
+            } catch (err) {
+                loading.classList.remove('show');
+                errorMsg.classList.add('show');
+            }
+
+            btn.disabled = false;
+        }
+    </script>
 </body>
 </html>
