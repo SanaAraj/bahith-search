@@ -74,12 +74,15 @@ async def search_endpoint(request: SearchRequest):
     if len(query) > 500:
         query = query[:500]
 
+    mode = request.mode if request.mode in ("semantic", "keyword", "hybrid") else "hybrid"
+    top_k = min(max(request.top_k, 1), 20)
+
     start_time = time.time()
 
     try:
-        results = search.search(query, mode=request.mode, top_k=request.top_k)
+        results = search.search(query, mode=mode, top_k=top_k)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Search error")
 
     answer = None
     if results:
