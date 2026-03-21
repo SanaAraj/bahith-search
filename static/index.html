@@ -245,12 +245,38 @@
             border-right: 3px solid #10b981;
         }
 
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
         .ai-label {
             font-size: 11px;
             color: #10b981;
             font-weight: 600;
-            margin-bottom: 8px;
         }
+
+        .confidence {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+        }
+
+        .confidence-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .confidence-high { background: #34d399; }
+        .confidence-high + span { color: #34d399; }
+        .confidence-mid { background: #fbbf24; }
+        .confidence-mid + span { color: #fbbf24; }
+        .confidence-low { background: #f87171; }
+        .confidence-low + span { color: #f87171; }
 
         .ai-text {
             font-size: 14px;
@@ -348,6 +374,39 @@
             margin-top: 8px;
         }
 
+        .related-searches {
+            margin-top: 1.5rem;
+        }
+
+        .related-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        .related-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .related-pill {
+            background: #12141d;
+            border: 1px solid #1c1f2e;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 12px;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .related-pill:hover {
+            border-color: #10b981;
+            color: #d1d5db;
+        }
+
         .empty-state {
             display: none;
             flex-direction: column;
@@ -417,7 +476,10 @@
 
         <div class="results-container" id="resultsContainer">
             <div class="ai-answer" id="aiAnswer">
-                <div class="ai-label">إجابة ذكية</div>
+                <div class="ai-header">
+                    <div class="ai-label">إجابة ذكية</div>
+                    <div class="confidence" id="confidence"></div>
+                </div>
                 <div class="ai-text" id="aiText"></div>
                 <div class="ai-sources" id="aiSources"></div>
             </div>
@@ -425,6 +487,11 @@
             <div class="results-header" id="resultsHeader"></div>
 
             <div class="results-list" id="resultsList"></div>
+
+            <div class="related-searches" id="relatedSearches" style="display: none;">
+                <div class="related-title">عمليات بحث مرتبطة</div>
+                <div class="related-pills" id="relatedPills"></div>
+            </div>
         </div>
     </div>
 
@@ -442,8 +509,11 @@
         const aiAnswer = document.getElementById('aiAnswer');
         const aiText = document.getElementById('aiText');
         const aiSources = document.getElementById('aiSources');
+        const confidenceEl = document.getElementById('confidence');
         const resultsHeader = document.getElementById('resultsHeader');
         const resultsList = document.getElementById('resultsList');
+        const relatedSearches = document.getElementById('relatedSearches');
+        const relatedPills = document.getElementById('relatedPills');
 
         function getSearchHistory() {
             try {
@@ -525,6 +595,11 @@
             if (!e.target.closest('.search-wrapper')) {
                 suggestions.classList.remove('show');
             }
+            const relatedPill = e.target.closest('.related-pill');
+            if (relatedPill) {
+                queryInput.value = relatedPill.dataset.query;
+                doSearch();
+            }
         });
 
         document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -585,9 +660,33 @@
                     aiText.textContent = data.answer;
                     const sources = data.results.slice(0, 3).map((_, i) => `نتيجة ${i + 1}`).join('، ');
                     aiSources.textContent = `المصادر: ${sources}`;
+
+                    const conf = data.confidence || 7;
+                    let confClass, confText;
+                    if (conf >= 7) {
+                        confClass = 'confidence-high';
+                        confText = 'إجابة موثوقة';
+                    } else if (conf >= 4) {
+                        confClass = 'confidence-mid';
+                        confText = 'إجابة جزئية';
+                    } else {
+                        confClass = 'confidence-low';
+                        confText = 'معلومات محدودة';
+                    }
+                    confidenceEl.innerHTML = `<div class="confidence-dot ${confClass}"></div><span>${confText}</span>`;
+
                     aiAnswer.style.display = 'block';
                 } else {
                     aiAnswer.style.display = 'none';
+                }
+
+                if (data.related_queries && data.related_queries.length > 0) {
+                    relatedPills.innerHTML = data.related_queries.map(q =>
+                        `<div class="related-pill" data-query="${q}">${q}</div>`
+                    ).join('');
+                    relatedSearches.style.display = 'block';
+                } else {
+                    relatedSearches.style.display = 'none';
                 }
 
                 resultsHeader.textContent = `${data.total_results} نتائج — ${data.search_time} ثانية`;

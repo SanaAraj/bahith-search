@@ -42,9 +42,12 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     answer: Optional[str]
+    confidence: int = 0
+    related_queries: list[str] = []
     results: list[SearchResult]
     total_results: int
     search_time: float
+    mode: str = "hybrid"
 
 
 @app.on_event("startup")
@@ -116,9 +119,15 @@ async def search_endpoint(request: SearchRequest):
         raise HTTPException(status_code=500, detail="Search error")
 
     answer = None
+    confidence = 0
+    related_queries = []
+
     if results:
         try:
-            answer = generate.generate_answer(query, results)
+            gen_result = generate.generate_answer(query, results)
+            answer = gen_result.get("answer")
+            confidence = gen_result.get("confidence", 0)
+            related_queries = gen_result.get("related", [])
         except:
             pass
 
@@ -137,9 +146,12 @@ async def search_endpoint(request: SearchRequest):
     return SearchResponse(
         query=query,
         answer=answer,
+        confidence=confidence,
+        related_queries=related_queries,
         results=search_results,
         total_results=len(search_results),
-        search_time=round(search_time, 2)
+        search_time=round(search_time, 2),
+        mode=mode
     )
 
 
