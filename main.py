@@ -66,6 +66,33 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/suggest")
+async def suggest(q: str = ""):
+    if not q or len(q) < 2:
+        return {"suggestions": []}
+
+    suggestions = set()
+    docs = bm25._documents or []
+
+    q_lower = q.strip()
+    for doc in docs[:500]:
+        title = doc.get('title', '')
+        if q_lower in title:
+            suggestions.add(title)
+        content = doc.get('content', '')[:200]
+        words = content.split()
+        for i, word in enumerate(words):
+            if word.startswith(q_lower) or q_lower in word:
+                phrase = ' '.join(words[max(0, i-1):i+3])
+                if len(phrase) > 5 and len(phrase) < 60:
+                    suggestions.add(phrase)
+
+        if len(suggestions) >= 5:
+            break
+
+    return {"suggestions": list(suggestions)[:5]}
+
+
 @app.post("/search", response_model=SearchResponse)
 async def search_endpoint(request: SearchRequest):
     if not request.query or not request.query.strip():

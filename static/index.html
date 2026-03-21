@@ -44,9 +44,66 @@
             margin-top: 6px;
         }
 
+        .search-wrapper {
+            position: relative;
+        }
+
         .search-box {
             display: flex;
             gap: 8px;
+        }
+
+        .suggestions {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            left: 56px;
+            margin-top: 4px;
+            background: #12141d;
+            border: 1px solid #1c1f2e;
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 100;
+        }
+
+        .suggestions.show {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 10px 16px;
+            font-size: 13px;
+            color: #d1d5db;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .suggestion-item:hover {
+            background: #1c1f2e;
+        }
+
+        .suggestion-item.history {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .suggestion-item svg {
+            flex-shrink: 0;
+        }
+
+        .clear-history {
+            padding: 8px 16px;
+            font-size: 11px;
+            color: #6b7280;
+            cursor: pointer;
+            border-top: 1px solid #1c1f2e;
+            text-align: center;
+        }
+
+        .clear-history:hover {
+            color: #f87171;
         }
 
         .search-input {
@@ -329,9 +386,12 @@
             <p class="subtitle">Bahith — Arabic semantic search engine</p>
         </header>
 
-        <div class="search-box">
-            <input type="text" class="search-input" id="query" placeholder="...ابحث في المحتوى العربي">
-            <button class="search-btn" id="searchBtn">بحث</button>
+        <div class="search-wrapper">
+            <div class="search-box">
+                <input type="text" class="search-input" id="query" placeholder="...ابحث في المحتوى العربي" autocomplete="off">
+                <button class="search-btn" id="searchBtn">بحث</button>
+            </div>
+            <div class="suggestions" id="suggestions"></div>
         </div>
 
         <div class="modes">
@@ -370,8 +430,10 @@
 
     <script>
         let currentMode = 'hybrid';
+        let debounceTimer = null;
         const queryInput = document.getElementById('query');
         const searchBtn = document.getElementById('searchBtn');
+        const suggestions = document.getElementById('suggestions');
         const hint = document.getElementById('hint');
         const loading = document.getElementById('loading');
         const errorMsg = document.getElementById('errorMsg');
@@ -383,6 +445,88 @@
         const resultsHeader = document.getElementById('resultsHeader');
         const resultsList = document.getElementById('resultsList');
 
+        function getSearchHistory() {
+            try {
+                return JSON.parse(localStorage.getItem('searchHistory') || '[]');
+            } catch { return []; }
+        }
+
+        function saveToHistory(query) {
+            let history = getSearchHistory();
+            history = history.filter(h => h !== query);
+            history.unshift(query);
+            history = history.slice(0, 5);
+            localStorage.setItem('searchHistory', JSON.stringify(history));
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('searchHistory');
+            suggestions.classList.remove('show');
+        }
+
+        function showHistory() {
+            const history = getSearchHistory();
+            if (history.length === 0) return;
+
+            suggestions.innerHTML = history.map(h => `
+                <div class="suggestion-item history" data-query="${h}">
+                    <svg width="14" height="14" fill="none" stroke="#4b5563" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <span>${h}</span>
+                </div>
+            `).join('') + '<div class="clear-history" onclick="clearHistory()">مسح السجل</div>';
+            suggestions.classList.add('show');
+        }
+
+        async function fetchSuggestions(q) {
+            if (q.length < 2) {
+                suggestions.classList.remove('show');
+                return;
+            }
+            try {
+                const resp = await fetch(`/suggest?q=${encodeURIComponent(q)}`);
+                const data = await resp.json();
+                if (data.suggestions.length > 0) {
+                    suggestions.innerHTML = data.suggestions.map(s => `
+                        <div class="suggestion-item" data-query="${s}">${s}</div>
+                    `).join('');
+                    suggestions.classList.add('show');
+                } else {
+                    suggestions.classList.remove('show');
+                }
+            } catch {}
+        }
+
+        queryInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            const q = queryInput.value.trim();
+            if (q.length === 0) {
+                showHistory();
+            } else {
+                debounceTimer = setTimeout(() => fetchSuggestions(q), 300);
+            }
+        });
+
+        queryInput.addEventListener('focus', () => {
+            if (queryInput.value.trim() === '') {
+                showHistory();
+            }
+        });
+
+        suggestions.addEventListener('click', e => {
+            const item = e.target.closest('.suggestion-item');
+            if (item) {
+                queryInput.value = item.dataset.query;
+                suggestions.classList.remove('show');
+                doSearch();
+            }
+        });
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.search-wrapper')) {
+                suggestions.classList.remove('show');
+            }
+        });
+
         document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -392,10 +536,16 @@
         });
 
         queryInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') doSearch();
+            if (e.key === 'Enter') {
+                suggestions.classList.remove('show');
+                doSearch();
+            }
         });
 
-        searchBtn.addEventListener('click', doSearch);
+        searchBtn.addEventListener('click', () => {
+            suggestions.classList.remove('show');
+            doSearch();
+        });
 
         async function doSearch() {
             const query = queryInput.value.trim();
@@ -406,6 +556,7 @@
                 return;
             }
 
+            saveToHistory(query);
             hint.style.display = 'none';
             errorMsg.classList.remove('show');
             emptyState.classList.remove('show');
