@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import search
 import bm25
 import generate
+import web_search
 from ingest import process_documents
 from config import TOP_K
 
@@ -74,13 +75,16 @@ async def search_endpoint(request: SearchRequest):
     if len(query) > 500:
         query = query[:500]
 
-    mode = request.mode if request.mode in ("semantic", "keyword", "hybrid") else "hybrid"
+    mode = request.mode if request.mode in ("semantic", "keyword", "hybrid", "web") else "hybrid"
     top_k = min(max(request.top_k, 1), 20)
 
     start_time = time.time()
 
     try:
-        results = search.search(query, mode=mode, top_k=top_k)
+        if mode == "web":
+            results = web_search.live_web_search(query, max_results=top_k)
+        else:
+            results = search.search(query, mode=mode, top_k=top_k)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Search error")
 
