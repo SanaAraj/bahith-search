@@ -31,6 +31,7 @@ The frontend is a single-page Arabic-first interface. Full RTL support, search m
 - **Three search modes**: Semantic (meaning-based), keyword (BM25), and hybrid (combines both)
 - **Arabic text preprocessing**: Diacritics removal, letter normalization (alef variants, taa marbuta)
 - **LLM answer generation**: RAG-style answers grounded in search results
+- **Web crawler**: Crawl and index any Arabic website
 - **Clean Arabic UI**: RTL layout, Arabic typography, responsive design
 
 ## Tech Stack
@@ -67,6 +68,22 @@ python main.py
 ```
 
 Open http://localhost:8000 in your browser.
+
+## Adding More Content
+
+The system can index any Arabic text. Beyond the Wikipedia seed data, you can crawl websites:
+
+```python
+from crawler import crawl_url
+
+# Crawl a single page
+crawl_url('https://ar.wikipedia.org/wiki/موضوع', 'ويكيبيديا')
+
+# Then re-index
+python embeddings.py
+```
+
+Or add text files directly to the `data/` folder and re-run `python embeddings.py`.
 
 ## Usage
 
@@ -148,6 +165,7 @@ bahith-search/
 ├── generate.py      # LLM answer generation
 ├── preprocessor.py  # Arabic text preprocessing
 ├── ingest.py        # Data ingestion pipeline
+├── crawler.py       # Web crawler for Arabic sites
 ├── seed_data.py     # Sample data generator
 ├── config.py        # Configuration
 ├── static/
