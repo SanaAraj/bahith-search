@@ -1,3 +1,4 @@
+import re
 from typing import List, Dict, Optional
 from openai import OpenAI
 from config import OPENAI_API_KEY, OPENAI_BASE_URL, MODEL_NAME
@@ -68,7 +69,6 @@ def generate_answer(query: str, results: List[Dict]) -> Dict:
             answer = parts[0].strip()
             rest = parts[1] if len(parts) > 1 else ""
 
-            import re
             conf_match = re.search(r'(\d+)', rest)
             if conf_match:
                 confidence = min(10, max(1, int(conf_match.group(1))))
