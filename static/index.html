@@ -290,12 +290,33 @@
             margin-top: 10px;
         }
 
-        .results-header {
+        .analytics-bar {
             display: flex;
             justify-content: center;
+            gap: 24px;
             padding: 12px 0;
+            margin: 1rem 0;
+            border-top: 1px solid #1c1f2e;
+            border-bottom: 1px solid #1c1f2e;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat svg {
+            flex-shrink: 0;
+        }
+
+        .stat span {
             font-size: 12px;
-            color: #4b5563;
+            color: #6b7280;
+        }
+
+        .results-header {
+            display: none;
         }
 
         .results-list {
@@ -491,6 +512,21 @@
                 <div class="ai-sources" id="aiSources"></div>
             </div>
 
+            <div class="analytics-bar" id="analyticsBar">
+                <div class="stat">
+                    <svg width="14" height="14" fill="none" stroke="#4b5563" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <span id="statResults">0 نتائج</span>
+                </div>
+                <div class="stat">
+                    <svg width="14" height="14" fill="none" stroke="#4b5563" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <span id="statTime">0 ثانية</span>
+                </div>
+                <div class="stat">
+                    <svg width="14" height="14" fill="none" stroke="#4b5563" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <span id="statMode">هجين</span>
+                </div>
+            </div>
+
             <div class="results-header" id="resultsHeader"></div>
 
             <div class="results-list" id="resultsList"></div>
@@ -521,6 +557,16 @@
         const resultsList = document.getElementById('resultsList');
         const relatedSearches = document.getElementById('relatedSearches');
         const relatedPills = document.getElementById('relatedPills');
+        const statResults = document.getElementById('statResults');
+        const statTime = document.getElementById('statTime');
+        const statMode = document.getElementById('statMode');
+
+        const modeLabels = {
+            'hybrid': 'هجين',
+            'semantic': 'دلالي',
+            'keyword': 'كلمات',
+            'web': 'ويب'
+        };
 
         function getSearchHistory() {
             try {
@@ -706,7 +752,9 @@
                     relatedSearches.style.display = 'none';
                 }
 
-                resultsHeader.textContent = `${data.total_results} نتائج — ${data.search_time} ثانية`;
+                statResults.textContent = `${data.total_results} نتائج`;
+                statTime.textContent = `${data.search_time} ثانية`;
+                statMode.textContent = modeLabels[data.mode] || data.mode;
 
                 resultsList.innerHTML = '';
                 data.results.forEach((r, index) => {
