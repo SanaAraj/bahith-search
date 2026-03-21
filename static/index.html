@@ -243,6 +243,7 @@
             border-radius: 12px;
             padding: 1.25rem 1.5rem;
             border-right: 3px solid #10b981;
+            scroll-margin-top: 20px;
         }
 
         .ai-header {
@@ -810,6 +811,10 @@
                 });
 
                 resultsContainer.classList.add('show');
+
+                setTimeout(() => {
+                    aiAnswer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
 
             } catch (err) {
                 loading.classList.remove('show');
