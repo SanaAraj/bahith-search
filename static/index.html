@@ -407,6 +407,13 @@
             color: #d1d5db;
         }
 
+        mark {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+
         .empty-state {
             display: none;
             flex-direction: column;
@@ -532,6 +539,16 @@
         function clearHistory() {
             localStorage.removeItem('searchHistory');
             suggestions.classList.remove('show');
+        }
+
+        function highlightTerms(text, query) {
+            const words = query.split(/\s+/).filter(w => w.length > 1);
+            let result = text;
+            words.forEach(word => {
+                const regex = new RegExp(`(${word})`, 'gi');
+                result = result.replace(regex, '<mark>$1</mark>');
+            });
+            return result;
         }
 
         function showHistory() {
@@ -698,6 +715,8 @@
                     if (r.score >= 0.85) scoreClass = 'score-green';
                     else if (r.score >= 0.6) scoreClass = 'score-amber';
 
+                    const highlightedSnippet = highlightTerms(r.snippet, query);
+
                     const card = document.createElement('div');
                     card.className = 'result-card';
                     card.style.animationDelay = `${index * 50}ms`;
@@ -706,7 +725,7 @@
                             <h3 class="result-title">${r.title}</h3>
                             <span class="score-badge ${scoreClass}">${scorePercent}%</span>
                         </div>
-                        <p class="result-snippet">${r.snippet}</p>
+                        <p class="result-snippet">${highlightedSnippet}</p>
                         <p class="result-source">${r.source}</p>
                     `;
                     resultsList.appendChild(card);
