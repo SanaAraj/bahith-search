@@ -435,6 +435,22 @@
             border-radius: 3px;
         }
 
+        .keyboard-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: #374151;
+        }
+
+        .keyboard-hint kbd {
+            background: #1c1f2e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 0 2px;
+        }
+
         .empty-state {
             display: none;
             flex-direction: column;
@@ -536,6 +552,8 @@
                 <div class="related-pills" id="relatedPills"></div>
             </div>
         </div>
+
+        <div class="keyboard-hint">اضغط <kbd>/</kbd> للبحث</div>
     </div>
 
     <script>
@@ -683,6 +701,18 @@
         searchBtn.addEventListener('click', () => {
             suggestions.classList.remove('show');
             doSearch();
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key === '/' && document.activeElement !== queryInput) {
+                e.preventDefault();
+                queryInput.focus();
+            }
+            if (e.key === 'Escape') {
+                queryInput.value = '';
+                queryInput.blur();
+                suggestions.classList.remove('show');
+            }
         });
 
         async function doSearch() {
