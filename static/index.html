@@ -312,7 +312,7 @@
                             <span class="score-badge ${scoreClass}">${scorePercent}%</span>
                         </div>
                         <div class="result-snippet">${r.snippet}</div>
-                        <div class="result-source">ويكيبيديا العربية — ${r.source}</div>
+                        <div class="result-source">${r.source === 'web' ? 'نتيجة من الويب' : r.source}</div>
                     `;
                     results.appendChild(card);
                 });

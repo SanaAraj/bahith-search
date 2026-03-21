@@ -24,11 +24,12 @@ def search_duckduckgo(query: str, max_results: int = 5) -> List[Dict]:
             link_elem = r.select_one('.result__url')
 
             if title_elem and snippet_elem:
+                url = link_elem.get_text(strip=True) if link_elem else ''
                 results.append({
                     'title': title_elem.get_text(strip=True),
                     'snippet': snippet_elem.get_text(strip=True),
-                    'url': link_elem.get_text(strip=True) if link_elem else '',
-                    'source': 'web'
+                    'url': url,
+                    'source': url if url else 'web'
                 })
 
         return results
