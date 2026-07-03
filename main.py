@@ -1,67 +1,71 @@
+import logging
 import time
-from typing import Optional
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
-import search
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
 import bm25
 import generate
+import search
 import web_search
+from config import STATIC_DIR
 from ingest import process_documents
-from config import TOP_K
+from observability import trace_query
+from schemas import SearchRequest, SearchResponse, SearchResultModel
 
-app = FastAPI(title="Bahith", description="Arabic Semantic Search Engine")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("bahith")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ensure the BM25 keyword index is ready before serving.
+
+    The vector store (ChromaDB) is built separately via ``build_index.py`` so
+    that the heavy embedding step happens at image-build time, not per request.
+    """
+    if not bm25.is_loaded() and not bm25.load_index():
+        docs = process_documents()
+        if docs:
+            bm25.build_index(docs)
+            bm25.save_index()
+            logger.info("Built BM25 index from %d chunks", len(docs))
+        else:
+            logger.warning(
+                "No documents found. Run `python build_index.py` to seed and "
+                "index content before querying."
+            )
+    yield
+
+
+app = FastAPI(
+    title="Bahith",
+    description="Arabic Semantic Search Engine",
+    lifespan=lifespan,
+)
+
+# The API is stateless and uses no cookies, so a permissive origin policy is
+# safe here. Credentials must stay disabled for a wildcard origin to be valid.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-class SearchRequest(BaseModel):
-    query: str
-    mode: str = "hybrid"
-    top_k: int = TOP_K
-
-
-class SearchResult(BaseModel):
-    title: str
-    snippet: str
-    source: str
-    score: float
-
-
-class SearchResponse(BaseModel):
-    query: str
-    answer: Optional[str]
-    confidence: int = 0
-    related_queries: list[str] = []
-    results: list[SearchResult]
-    total_results: int
-    search_time: float
-    mode: str = "hybrid"
-
-
-@app.on_event("startup")
-async def startup():
-    if not bm25.is_loaded():
-        if not bm25.load_index():
-            docs = process_documents()
-            bm25.build_index(docs)
-            bm25.save_index()
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")
@@ -71,23 +75,22 @@ async def health():
 
 @app.get("/suggest")
 async def suggest(q: str = ""):
-    if not q or len(q) < 2:
+    q_lower = q.strip()
+    if len(q_lower) < 2:
         return {"suggestions": []}
 
-    suggestions = set()
+    suggestions: set[str] = set()
     docs = bm25._documents or []
 
-    q_lower = q.strip()
     for doc in docs[:500]:
-        title = doc.get('title', '')
+        title = doc.get("title", "")
         if q_lower in title:
             suggestions.add(title)
-        content = doc.get('content', '')[:200]
-        words = content.split()
+        words = doc.get("content", "")[:200].split()
         for i, word in enumerate(words):
             if word.startswith(q_lower) or q_lower in word:
-                phrase = ' '.join(words[max(0, i-1):i+3])
-                if len(phrase) > 5 and len(phrase) < 60:
+                phrase = " ".join(words[max(0, i - 1):i + 3])
+                if 5 < len(phrase) < 60:
                     suggestions.add(phrase)
 
         if len(suggestions) >= 5:
@@ -98,50 +101,48 @@ async def suggest(q: str = ""):
 
 @app.post("/search", response_model=SearchResponse)
 async def search_endpoint(request: SearchRequest):
-    if not request.query or not request.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
-
     query = request.query.strip()
-    if len(query) > 500:
-        query = query[:500]
-
-    mode = request.mode if request.mode in ("semantic", "keyword", "hybrid", "web") else "hybrid"
-    top_k = min(max(request.top_k, 1), 20)
+    if not query:
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
 
     start_time = time.time()
 
-    try:
-        if mode == "web":
-            results = web_search.live_web_search(query, max_results=top_k)
-        else:
-            results = search.search(query, mode=mode, top_k=top_k)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Search error")
-
-    answer = None
-    confidence = 0
-    related_queries = []
-
-    if results:
+    with trace_query(query, mode=request.mode, top_k=request.top_k) as tr:
         try:
-            gen_result = generate.generate_answer(query, results)
+            with tr.span("retrieval", mode=request.mode):
+                if request.mode == "web":
+                    results = web_search.live_web_search(query, max_results=request.top_k)
+                else:
+                    results = search.search(query, mode=request.mode, top_k=request.top_k)
+        except Exception:
+            logger.exception("Search failed for query=%r mode=%s", query, request.mode)
+            raise HTTPException(status_code=500, detail="Search failed") from None
+
+        answer = None
+        confidence = 0
+        related_queries: list[str] = []
+
+        if results:
+            with tr.span("generation"):
+                gen_result = generate.generate_answer(query, results)
             answer = gen_result.get("answer")
             confidence = gen_result.get("confidence", 0)
             related_queries = gen_result.get("related", [])
-        except:
-            pass
+
+        tr.update(output={"num_results": len(results), "confidence": confidence})
 
     search_results = []
     for r in results:
-        snippet = r['content'][:300] + "..." if len(r['content']) > 300 else r['content']
-        search_results.append(SearchResult(
-            title=r['title'],
-            snippet=snippet,
-            source=r['source'],
-            score=r['score']
-        ))
-
-    search_time = time.time() - start_time
+        content = r["content"]
+        snippet = content[:300] + "..." if len(content) > 300 else content
+        search_results.append(
+            SearchResultModel(
+                title=r["title"],
+                snippet=snippet,
+                source=r["source"],
+                score=r["score"],
+            )
+        )
 
     return SearchResponse(
         query=query,
@@ -150,11 +151,12 @@ async def search_endpoint(request: SearchRequest):
         related_queries=related_queries,
         results=search_results,
         total_results=len(search_results),
-        search_time=round(search_time, 2),
-        mode=mode
+        search_time=round(time.time() - start_time, 2),
+        mode=request.mode,
     )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
