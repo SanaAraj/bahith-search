@@ -8,10 +8,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 import bm25
+import embeddings
 import generate
 import search
 import web_search
-from config import STATIC_DIR
+from config import STATIC_DIR, WARMUP_ON_STARTUP
 from ingest import process_documents
 from observability import trace_query
 from schemas import SearchRequest, SearchResponse, SearchResultModel
@@ -41,6 +42,20 @@ async def lifespan(app: FastAPI):
                 "No documents found. Run `python build_index.py` to seed and "
                 "index content before querying."
             )
+
+    # Warm the embedding model and vector collection so the first user query
+    # doesn't pay the one-time model load. Failures here must not block serving
+    # (keyword mode still works without embeddings).
+    if WARMUP_ON_STARTUP:
+        try:
+            embeddings.get_embedding_model()
+            embeddings.get_collection()
+            logger.info("Embedding model warmed")
+        except Exception:
+            logger.warning(
+                "Embedding warmup failed; first semantic query will be slower", exc_info=True
+            )
+
     yield
 
 

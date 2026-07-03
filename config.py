@@ -26,6 +26,10 @@ FALLBACK_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM
 SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.7"))
 TOP_K = int(os.getenv("TOP_K", "5"))
 
+# Preload the embedding model at startup so the first query is fast. Disable in
+# tests / lightweight environments that never run semantic search.
+WARMUP_ON_STARTUP = os.getenv("WARMUP_ON_STARTUP", "true").lower() in ("1", "true", "yes")
+
 # Paths (anchored to repo root, CWD-independent)
 CHROMA_PATH = str(BASE_DIR / "chroma_db")
 DATA_PATH = BASE_DIR / "data"
