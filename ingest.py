@@ -1,33 +1,26 @@
-import os
-from typing import List, Dict
-from preprocessor import preprocess
 from config import DATA_PATH
+from preprocessor import preprocess
+from schemas import Document
 
 
-def read_documents() -> List[Dict]:
-    docs = []
-    if not os.path.exists(DATA_PATH):
+def read_documents() -> list[dict]:
+    docs: list[dict] = []
+    if not DATA_PATH.exists():
         return docs
 
-    for filename in os.listdir(DATA_PATH):
-        if not filename.endswith('.txt'):
-            continue
-
-        filepath = os.path.join(DATA_PATH, filename)
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        title = filename.replace('.txt', '').replace('_', ' ')
+    for filepath in sorted(DATA_PATH.glob("*.txt")):
+        content = filepath.read_text(encoding="utf-8")
+        title = filepath.stem.replace("_", " ")
         docs.append({
-            'title': title,
-            'content': content,
-            'source': filename
+            "title": title,
+            "content": content,
+            "source": filepath.name,
         })
 
     return docs
 
 
-def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> list[str]:
     if len(text) <= chunk_size:
         return [text]
 
@@ -51,7 +44,7 @@ def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> List[str
     return [c for c in chunks if len(c) > 50]
 
 
-def process_documents() -> List[Dict]:
+def process_documents() -> list[Document]:
     docs = read_documents()
     processed = []
 
@@ -75,11 +68,11 @@ if __name__ == "__main__":
     print("Processing documents...")
     chunks = process_documents()
 
-    print(f"\nTotal documents: {len(os.listdir(DATA_PATH))}")
+    print(f"\nTotal documents: {len(read_documents())}")
     print(f"Total chunks: {len(chunks)}")
 
     if chunks:
-        print(f"\nSample chunk:")
+        print("\nSample chunk:")
         print(f"ID: {chunks[0]['id']}")
         print(f"Title: {chunks[0]['title']}")
         print(f"Content: {chunks[0]['content'][:200]}...")

@@ -1,7 +1,8 @@
 import os
+
 import wikipedia
 
-DATA_PATH = "data"
+from config import DATA_PATH
 
 TOPICS = [
     "الذكاء الاصطناعي",

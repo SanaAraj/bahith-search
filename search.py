@@ -1,11 +1,11 @@
-from typing import List, Dict
-import embeddings
 import bm25
-from preprocessor import preprocess
+import embeddings
 from config import SEARCH_ALPHA, TOP_K
+from preprocessor import preprocess
+from schemas import SearchHit
 
 
-def normalize_scores(results: List[Dict]) -> List[Dict]:
+def normalize_scores(results: list[dict]) -> list[dict]:
     if not results:
         return results
 
@@ -23,18 +23,18 @@ def normalize_scores(results: List[Dict]) -> List[Dict]:
     return results
 
 
-def semantic_search(query: str, top_k: int = TOP_K) -> List[Dict]:
+def semantic_search(query: str, top_k: int = TOP_K) -> list[dict]:
     query = preprocess(query)
     results = embeddings.search(query, top_k=top_k * 2)
     return normalize_scores(results)
 
 
-def keyword_search(query: str, top_k: int = TOP_K) -> List[Dict]:
+def keyword_search(query: str, top_k: int = TOP_K) -> list[dict]:
     results = bm25.search(query, top_k=top_k * 2)
     return normalize_scores(results)
 
 
-def hybrid_search(query: str, alpha: float = SEARCH_ALPHA, top_k: int = TOP_K) -> List[Dict]:
+def hybrid_search(query: str, alpha: float = SEARCH_ALPHA, top_k: int = TOP_K) -> list[SearchHit]:
     sem_results = semantic_search(query, top_k)
     kw_results = keyword_search(query, top_k)
 
@@ -78,7 +78,7 @@ def hybrid_search(query: str, alpha: float = SEARCH_ALPHA, top_k: int = TOP_K) -
     return results[:top_k]
 
 
-def search(query: str, mode: str = "hybrid", top_k: int = TOP_K) -> List[Dict]:
+def search(query: str, mode: str = "hybrid", top_k: int = TOP_K) -> list[SearchHit]:
     if mode == "semantic":
         results = semantic_search(query, top_k)
         return [{'id': r['id'], 'content': r['content'], 'title': r['title'],

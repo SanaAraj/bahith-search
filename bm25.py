@@ -1,52 +1,52 @@
 import pickle
-import os
-from typing import List, Dict, Optional
+
 from rank_bm25 import BM25Okapi
+
+from config import BM25_INDEX_PATH
 from preprocessor import preprocess
+from schemas import Document, SearchHit
 
-_bm25_index = None
-_documents = None
-BM25_INDEX_PATH = "bm25_index.pkl"
+_bm25_index: BM25Okapi | None = None
+_documents: list[Document] | None = None
 
 
-def tokenize(text: str) -> List[str]:
+def tokenize(text: str) -> list[str]:
     return text.split()
 
 
-def build_index(docs: List[Dict]) -> None:
+def build_index(docs: list[Document]) -> None:
     global _bm25_index, _documents
 
     _documents = docs
-    tokenized = [tokenize(d['content']) for d in docs]
+    tokenized = [tokenize(d["content"]) for d in docs]
     _bm25_index = BM25Okapi(tokenized)
 
 
-def save_index():
+def save_index() -> None:
     if _bm25_index is None or _documents is None:
         return
-    with open(BM25_INDEX_PATH, 'wb') as f:
-        pickle.dump({'index': _bm25_index, 'documents': _documents}, f)
+    with open(BM25_INDEX_PATH, "wb") as f:
+        pickle.dump({"index": _bm25_index, "documents": _documents}, f)
 
 
 def load_index() -> bool:
     global _bm25_index, _documents
 
-    if not os.path.exists(BM25_INDEX_PATH):
+    if not BM25_INDEX_PATH.exists():
         return False
 
-    with open(BM25_INDEX_PATH, 'rb') as f:
+    with open(BM25_INDEX_PATH, "rb") as f:
         data = pickle.load(f)
-        _bm25_index = data['index']
-        _documents = data['documents']
+        _bm25_index = data["index"]
+        _documents = data["documents"]
     return True
 
 
-def search(query: str, top_k: int = 5) -> List[Dict]:
+def search(query: str, top_k: int = 5) -> list[SearchHit]:
     global _bm25_index, _documents
 
-    if _bm25_index is None:
-        if not load_index():
-            return []
+    if _bm25_index is None and not load_index():
+        return []
 
     query = preprocess(query)
     tokenized_query = tokenize(query)

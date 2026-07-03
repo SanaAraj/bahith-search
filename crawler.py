@@ -1,11 +1,12 @@
+import hashlib
 import os
 import re
 import time
-import hashlib
+from urllib.parse import urljoin, urlparse
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-from typing import List, Set
+
 from config import DATA_PATH
 
 HEADERS = {
@@ -76,7 +77,7 @@ def crawl_page(url: str) -> dict:
         return None
 
 
-def extract_links(soup: BeautifulSoup, base_url: str, domain: str) -> List[str]:
+def extract_links(soup: BeautifulSoup, base_url: str, domain: str) -> list[str]:
     links = []
     for a in soup.find_all('a', href=True):
         href = a['href']
@@ -94,11 +95,11 @@ def extract_links(soup: BeautifulSoup, base_url: str, domain: str) -> List[str]:
     return links
 
 
-def crawl_site(start_url: str, source_name: str, max_pages: int = 10) -> List[dict]:
+def crawl_site(start_url: str, source_name: str, max_pages: int = 10) -> list[dict]:
     parsed = urlparse(start_url)
     domain = parsed.netloc
 
-    visited: Set[str] = set()
+    visited: set[str] = set()
     to_visit = [start_url]
     pages = []
 
@@ -135,7 +136,7 @@ def crawl_site(start_url: str, source_name: str, max_pages: int = 10) -> List[di
     return pages
 
 
-def save_crawled_pages(pages: List[dict]):
+def save_crawled_pages(pages: list[dict]):
     os.makedirs(DATA_PATH, exist_ok=True)
 
     for page in pages:

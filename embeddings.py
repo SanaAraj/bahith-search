@@ -1,11 +1,14 @@
-import os
-from typing import List, Dict, Optional
-from sentence_transformers import SentenceTransformer
-import chromadb
-from chromadb.config import Settings
-from config import EMBEDDING_MODEL, FALLBACK_EMBEDDING_MODEL, CHROMA_PATH
+import logging
 
-_model = None
+import chromadb
+from sentence_transformers import SentenceTransformer
+
+from config import CHROMA_PATH, EMBEDDING_MODEL, FALLBACK_EMBEDDING_MODEL
+from schemas import Document, SearchHit
+
+logger = logging.getLogger(__name__)
+
+_model: SentenceTransformer | None = None
 _chroma_client = None
 _collection = None
 
@@ -18,6 +21,11 @@ def get_embedding_model() -> SentenceTransformer:
     try:
         _model = SentenceTransformer(EMBEDDING_MODEL)
     except Exception:
+        logger.warning(
+            "Could not load embedding model %s; falling back to %s",
+            EMBEDDING_MODEL,
+            FALLBACK_EMBEDDING_MODEL,
+        )
         _model = SentenceTransformer(FALLBACK_EMBEDDING_MODEL)
 
     return _model
@@ -36,7 +44,7 @@ def get_collection():
     return _collection
 
 
-def add_documents(docs: List[Dict]):
+def add_documents(docs: list[Document]) -> None:
     model = get_embedding_model()
     collection = get_collection()
 
@@ -58,7 +66,7 @@ def add_documents(docs: List[Dict]):
         )
 
 
-def search(query: str, top_k: int = 5) -> List[Dict]:
+def search(query: str, top_k: int = 5) -> list[SearchHit]:
     model = get_embedding_model()
     collection = get_collection()
 
@@ -91,13 +99,14 @@ def get_document_count() -> int:
     return collection.count()
 
 
-def clear_collection():
+def clear_collection() -> None:
     global _collection
     client = chromadb.PersistentClient(path=CHROMA_PATH)
     try:
         client.delete_collection("arabic_docs")
-    except:
-        pass
+    except Exception:
+        # Collection does not exist yet; nothing to clear.
+        logger.debug("clear_collection: no existing 'arabic_docs' collection")
     _collection = None
 
 

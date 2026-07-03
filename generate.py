@@ -1,9 +1,14 @@
+import logging
 import re
-from typing import List, Dict, Optional
-from openai import OpenAI
-from config import OPENAI_API_KEY, OPENAI_BASE_URL, MODEL_NAME
 
-_client = None
+from openai import OpenAI
+
+from config import MODEL_NAME, OPENAI_API_KEY, OPENAI_BASE_URL
+from schemas import SearchHit
+
+logger = logging.getLogger(__name__)
+
+_client: OpenAI | None = None
 
 SYSTEM_PROMPT = """أنت مساعد بحث ذكي. أجب على السؤال باللغة العربية فقط بناءً على السياق المقدم.
 
@@ -25,7 +30,7 @@ def get_client() -> OpenAI:
     return _client
 
 
-def generate_answer(query: str, results: List[Dict]) -> Dict:
+def generate_answer(query: str, results: list[SearchHit]) -> dict:
     default = {"answer": None, "confidence": 0, "related": []}
 
     if not results:
@@ -79,12 +84,12 @@ def generate_answer(query: str, results: List[Dict]) -> Dict:
 
         return {"answer": answer, "confidence": confidence, "related": related}
 
-    except Exception as e:
-        print(f"Generation error: {e}")
+    except Exception:
+        logger.exception("LLM answer generation failed")
         return default
 
 
-def get_source_citations(results: List[Dict], count: int = 3) -> str:
+def get_source_citations(results: list[SearchHit], count: int = 3) -> str:
     sources = [r['title'] for r in results[:count]]
     return "، ".join(sources)
 
