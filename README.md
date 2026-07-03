@@ -1,175 +1,180 @@
 # باحث — Bahith
 
-A semantic search engine built specifically for Arabic content. It combines Arabic-optimized embeddings, hybrid search (semantic + keyword), and LLM-powered answer generation with a clean RTL web interface.
+Arabic-first semantic search that combines Arabic-optimized embeddings, hybrid
+retrieval, and grounded LLM answers, for developers building Arabic search over
+their own documents.
 
-Arabic text search is an underserved problem. Most search tools are built for English and don't handle Arabic's unique characteristics—diacritics, letter variants, right-to-left text. Bahith addresses this with proper Arabic preprocessing, multilingual embeddings, and a native Arabic interface.
+[![CI](https://github.com/SanaAraj/bahith-search/actions/workflows/ci.yml/badge.svg)](https://github.com/SanaAraj/bahith-search/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
-## How It Works
+> **Live demo:** _pending deployment to Hugging Face Spaces_ — see [Roadmap](#roadmap).
 
+## Why this exists
+
+Most search stacks are built for English and mishandle Arabic: diacritics,
+letter-form variants (أ/إ/آ/ا, ة/ه, ى/ي), and right-to-left rendering all
+degrade recall. Bahith addresses this with proper Arabic normalization, an
+Arabic-tuned embedding model, and BM25 keyword matching fused into a single
+ranking — plus optional LLM answers grounded in the retrieved passages.
+
+## Results
+
+Measured on the bundled 12-document offline corpus. All numbers are
+reproducible via the linked scripts; see
+[Evaluation methodology](#evaluation-methodology) for the setup.
+
+### Retrieval quality — [`eval/run_eval.py`](eval/run_eval.py)
+
+| Metric | Value | Queries | Embedding model | Date |
+|---|---|---|---|---|
+| recall@5 | 1.00 | 28 | Arabic-Triplet-Matryoshka-V2 | 2026-07-03 |
+| MRR | 1.00 | 28 | Arabic-Triplet-Matryoshka-V2 | 2026-07-03 |
+
+> **Honest caveat:** on this small, topically-distinct corpus the eval is
+> **saturated** — every query maps to one obvious document, so a working system
+> scores 1.00. Treat this as "retrieval is wired correctly," **not** as a
+> quality benchmark. Making it discriminative (a larger corpus with confusable
+> topics and multi-relevant queries) is tracked in
+> [`eval/DATASET.md`](eval/DATASET.md) and the [Roadmap](#roadmap).
+
+### Latency — [`benchmark.py`](benchmark.py)
+
+Darwin arm64, CPU only, 28 queries × 10 iterations, 2026-07-03.
+
+| Path | p50 | p95 |
+|---|---|---|
+| Keyword (BM25) | 0.03 ms | 0.04 ms |
+| Semantic (embed + vector) | 48.2 ms | 69.0 ms |
+| Hybrid | 49.6 ms | 69.6 ms |
+
+### Answer generation (LLM) — cost & latency
+
+| Metric | Value |
+|---|---|
+| p50 / p95 latency | TBD |
+| Cost per query | TBD |
+
+TBD until run with an `OPENAI_API_KEY` set — `benchmark.py` measures and prices
+this path from token usage automatically. It is unmeasured here rather than
+estimated.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    Q["Arabic query"] --> P["Preprocess<br/>(normalize, strip diacritics)"]
+    P --> S["Semantic search<br/>embeddings → ChromaDB"]
+    P --> K["Keyword search<br/>BM25"]
+    S --> F["Normalize + weighted fusion<br/>α·semantic + (1−α)·keyword"]
+    K --> F
+    F --> T["Top-K passages"]
+    T --> G["LLM answer<br/>(grounded, optional)"]
+    G --> R["Response: answer + ranked results"]
+    T --> R
+    F -. "optional spans" .-> O["Langfuse tracing"]
 ```
-User query (Arabic)
-    ↓
-Arabic preprocessing (normalize, remove diacritics)
-    ↓
-Parallel search:
-    ├─ Semantic: embed query → ChromaDB similarity
-    └─ Keyword: BM25 scoring
-    ↓
-Hybrid ranking (weighted fusion)
-    ↓
-Top-K results
-    ↓
-LLM generates answer using results as context
-    ↓
-Return: AI answer + ranked results
-```
 
-The frontend is a single-page Arabic-first interface. Full RTL support, search mode switching, color-coded relevance scores, and an AI-generated answer box with source attribution.
+## Quickstart
 
-## Features
-
-- **Three search modes**: Semantic (meaning-based), keyword (BM25), and hybrid (combines both)
-- **Arabic text preprocessing**: Diacritics removal, letter normalization (alef variants, taa marbuta)
-- **LLM answer generation**: RAG-style answers grounded in search results
-- **Web crawler**: Crawl and index any Arabic website
-- **Clean Arabic UI**: RTL layout, Arabic typography, responsive design
-
-## Tech Stack
-
-- **Embeddings**: sentence-transformers (Arabic-optimized model)
-- **Vector store**: ChromaDB (local, persistent)
-- **Keyword search**: rank-bm25
-- **LLM**: OpenAI-compatible API
-- **Backend**: FastAPI + uvicorn
-- **Frontend**: Vanilla HTML/CSS/JS
-
-## Setup
+Requires Python 3.11+.
 
 ```bash
-# Clone the repo
 git clone https://github.com/SanaAraj/bahith-search.git
 cd bahith-search
 
-# Install dependencies
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Create data folder and seed with sample content
-python seed_data.py
+# Seed the offline Arabic corpus and build both indices (one command).
+python build_index.py --offline
 
-# Build the search indices
-python embeddings.py
+# Optional: enable LLM answers (retrieval works without this).
+cp .env.example .env   # then add your OPENAI_API_KEY
 
-# Configure the LLM (create .env from template)
-cp .env.example .env
-# Edit .env with your API key
-
-# Run the server
-python main.py
+python main.py         # serves on http://localhost:8000
 ```
 
-Open http://localhost:8000 in your browser.
+Or with Docker (index baked into the image, queryable on first boot):
 
-## Adding More Content
-
-The system can index any Arabic text. Beyond the Wikipedia seed data, you can crawl websites:
-
-```python
-from crawler import crawl_url
-
-# Crawl a single page
-crawl_url('https://ar.wikipedia.org/wiki/موضوع', 'ويكيبيديا')
-
-# Then re-index
-python embeddings.py
+```bash
+docker compose up --build   # http://localhost:8000
 ```
 
-Or add text files directly to the `data/` folder and re-run `python embeddings.py`.
+## Usage examples
 
-## Usage
+### HTTP API
 
-1. Enter an Arabic query in the search box
-2. Select a search mode:
-   - **هجين (Hybrid)**: Best of both—combines semantic understanding with exact matches
-   - **بحث دلالي (Semantic)**: Finds conceptually similar content even with different wording
-   - **بحث كلمات (Keyword)**: Traditional keyword matching, good for exact phrases
-3. View the AI-generated answer and browse the ranked results
-
-## Hybrid Search
-
-The hybrid approach combines semantic and keyword scores:
-
-```
-final_score = α × semantic_score + (1 - α) × keyword_score
+```bash
+curl -s http://localhost:8000/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query": "ما هي عاصمة السعودية ورؤية 2030", "mode": "hybrid", "top_k": 3}'
 ```
 
-Default α is 0.7, favoring semantic understanding while still boosting exact keyword matches. Both scores are normalized to [0, 1] before combining.
-
-## API
-
-### POST /search
-
-```json
-{
-  "query": "ما هي المملكة العربية السعودية",
-  "mode": "hybrid",
-  "top_k": 5
-}
-```
-
-Response:
-
-```json
-{
-  "query": "ما هي المملكة العربية السعودية",
-  "answer": "المملكة العربية السعودية هي أكبر دولة في شبه الجزيرة العربية...",
-  "results": [
-    {
-      "title": "المملكة العربية السعودية",
-      "snippet": "...",
-      "source": "المملكة_العربية_السعودية.txt",
-      "score": 0.95
-    }
-  ],
-  "total_results": 5,
-  "search_time": 0.34
-}
-```
-
-### GET /health
-
-Returns `{"status": "ok"}` if the server is running.
-
-## Configuration
-
-Environment variables (`.env`):
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OPENAI_API_KEY` | API key for LLM | required |
-| `OPENAI_BASE_URL` | API endpoint | https://api.groq.com/openai/v1 |
-| `MODEL_NAME` | LLM model ID | llama-3.1-8b-instant |
-| `EMBEDDING_MODEL` | Embedding model | Omartificial-Intelligence-Space/Matryoshka-Arabic-STS-V1 |
-| `SEARCH_ALPHA` | Hybrid weighting | 0.7 |
-| `TOP_K` | Default results count | 5 |
-
-Works with any OpenAI-compatible API provider (OpenAI, Together, Fireworks, etc).
-
-## Project Structure
+Real ranked output (hybrid mode, Arabic-Triplet-Matryoshka-V2):
 
 ```
-bahith-search/
-├── main.py          # FastAPI app
-├── search.py        # Hybrid search logic
-├── embeddings.py    # Vector store operations
-├── bm25.py          # BM25 keyword search
-├── generate.py      # LLM answer generation
-├── preprocessor.py  # Arabic text preprocessing
-├── ingest.py        # Data ingestion pipeline
-├── crawler.py       # Web crawler for Arabic sites
-├── seed_data.py     # Sample data generator
-├── config.py        # Configuration
-├── static/
-│   └── index.html   # Frontend
-├── requirements.txt
-└── .env.example
+[1.000] المملكة العربية السعودية   (المملكة_العربية_السعودية.txt)
+[0.288] الطاقة المتجددة            (الطاقة_المتجددة.txt)
+[0.134] كرة القدم                 (كرة_القدم.txt)
 ```
+
+The correct document is retrieved with a wide margin over unrelated topics.
+With `OPENAI_API_KEY` set, the response also includes a grounded Arabic
+`answer` synthesized from the top passages, plus a confidence score and related
+queries. (Capturing that answer output requires a key; it is not shown here to
+avoid publishing an unverified example.)
+
+### Search modes
+
+| Mode | Arabic | Best for |
+|---|---|---|
+| `hybrid` | هجين | Default — semantic understanding + exact matches |
+| `semantic` | بحث دلالي | Conceptual matches with different wording |
+| `keyword` | بحث كلمات | Exact phrases and names |
+| `web` | ويب | Live web results (best-effort scraping) |
+
+## Evaluation methodology
+
+- **Corpus:** 12 Modern Standard Arabic documents, deterministically seeded via
+  `build_index.py --offline` (no network), so runs reproduce exactly.
+- **Queries:** 28 fixed queries in [`eval/dataset.json`](eval/dataset.json) —
+  24 MSA and 4 dialectal (Gulf/Egyptian) — each labeled with the document(s)
+  judged relevant. Relevance is document-level: a document counts as retrieved
+  if any of its chunks appears in the ranked list.
+- **Metrics:** mean recall@5 and MRR ([`eval/metrics.py`](eval/metrics.py),
+  unit-tested).
+- **Determinism:** retrieval has no sampling; reports record the embedding
+  model id and a UTC timestamp. Full design notes and the saturation caveat are
+  in [`eval/DATASET.md`](eval/DATASET.md).
+- **CI gate:** every PR runs the eval and fails if recall@5 or MRR drops below
+  threshold.
+
+## Limitations
+
+- **The eval is saturated** (see Results). It is a regression floor today, not a
+  quality benchmark, until the corpus grows.
+- **Small bundled corpus** (12 docs). It demonstrates the pipeline; it is not a
+  broad knowledge base.
+- **CPU latency** (~50 ms hybrid p50) is dominated by embedding inference and is
+  hardware-dependent; a GPU or a smaller Matryoshka dimension would cut it.
+- **Web mode scrapes DuckDuckGo HTML**, which is brittle and can break without
+  notice; it is best-effort, not a supported retrieval path.
+- **LLM answer quality** depends on the configured model and is only as good as
+  the retrieved context; answers can still be wrong.
+- **Embedding model fallback:** if the primary Arabic model can't be fetched,
+  the app falls back to a generic multilingual model (lower Arabic quality) and
+  logs a warning.
+
+## Roadmap
+
+- Expand the eval corpus to ~30–50 docs with confusable topics and
+  multi-relevant queries so recall@5/MRR become discriminative.
+- Measure and publish the LLM answer-path latency and per-query cost.
+- Deploy the live demo to Hugging Face Spaces and link it above.
+- Replace DuckDuckGo scraping with a supported search API for `web` mode.
+- Add a re-ranking stage (cross-encoder) and tune the hybrid α on real queries.
+
+## License
+
+[MIT](LICENSE)
