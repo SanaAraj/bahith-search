@@ -1,0 +1,19 @@
+services:
+  bahith:
+    build: .
+    image: bahith-search
+    ports:
+      - "8000:8000"
+    # Optional: provide OPENAI_API_KEY (and overrides) for LLM answer
+    # generation. Retrieval works without it. Copy .env.example to .env first.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
