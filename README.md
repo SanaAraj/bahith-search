@@ -1,8 +1,8 @@
-# باحث — Bahith
+# باحث - Bahith
 
 A semantic search engine built specifically for Arabic content. It combines Arabic-optimized embeddings, hybrid search (semantic + keyword), and LLM-powered answer generation with a clean RTL web interface.
 
-Arabic text search is an underserved problem. Most search tools are built for English and don't handle Arabic's unique characteristics—diacritics, letter variants, right-to-left text. Bahith addresses this with proper Arabic preprocessing, multilingual embeddings, and a native Arabic interface.
+Arabic text search is an underserved problem. Most search tools are built for English and don't handle Arabic's unique characteristics: diacritics, letter variants, right-to-left text. Bahith addresses this with proper Arabic preprocessing, multilingual embeddings, and a native Arabic interface.
 
 ## How It Works
 
@@ -89,7 +89,7 @@ Or add text files directly to the `data/` folder and re-run `python embeddings.p
 
 1. Enter an Arabic query in the search box
 2. Select a search mode:
-   - **هجين (Hybrid)**: Best of both—combines semantic understanding with exact matches
+   - **هجين (Hybrid)**: Best of both, combining semantic understanding with exact matches
    - **بحث دلالي (Semantic)**: Finds conceptually similar content even with different wording
    - **بحث كلمات (Keyword)**: Traditional keyword matching, good for exact phrases
 3. View the AI-generated answer and browse the ranked results
