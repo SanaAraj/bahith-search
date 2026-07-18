@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Optional
 from fastapi import FastAPI, HTTPException
@@ -13,13 +14,15 @@ import web_search
 from ingest import process_documents
 from config import TOP_K
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Bahith", description="Arabic Semantic Search Engine")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -115,8 +118,9 @@ async def search_endpoint(request: SearchRequest):
             results = web_search.live_web_search(query, max_results=top_k)
         else:
             results = search.search(query, mode=mode, top_k=top_k)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Search error")
+    except Exception:
+        logger.exception("Search failed for query=%r mode=%s", query, mode)
+        raise HTTPException(status_code=500, detail="Search failed") from None
 
     answer = None
     confidence = 0
@@ -128,8 +132,8 @@ async def search_endpoint(request: SearchRequest):
             answer = gen_result.get("answer")
             confidence = gen_result.get("confidence", 0)
             related_queries = gen_result.get("related", [])
-        except:
-            pass
+        except Exception:
+            logger.exception("Answer generation failed for query=%r", query)
 
     search_results = []
     for r in results:

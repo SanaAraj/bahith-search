@@ -1,9 +1,12 @@
+import logging
 import os
 from typing import List, Dict, Optional
 from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
 from config import EMBEDDING_MODEL, FALLBACK_EMBEDDING_MODEL, CHROMA_PATH
+
+logger = logging.getLogger(__name__)
 
 _model = None
 _chroma_client = None
@@ -96,8 +99,9 @@ def clear_collection():
     client = chromadb.PersistentClient(path=CHROMA_PATH)
     try:
         client.delete_collection("arabic_docs")
-    except:
-        pass
+    except Exception:
+        # Collection does not exist yet; nothing to clear.
+        logger.debug("clear_collection: no existing 'arabic_docs' collection")
     _collection = None
 
 

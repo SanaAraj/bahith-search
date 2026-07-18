@@ -1,7 +1,11 @@
+import logging
+
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict
 from preprocessor import preprocess
+
+logger = logging.getLogger(__name__)
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -53,7 +57,8 @@ def fetch_page_content(url: str) -> str:
 
         text = soup.get_text(separator=' ', strip=True)
         return preprocess(text[:2000])
-    except:
+    except requests.RequestException:
+        logger.debug("Failed to fetch page content: %s", url, exc_info=True)
         return ""
 
 
